@@ -1,0 +1,132 @@
+---
+# данный плейбук устанавливает все необходимое на домашний ПК
+# Запускается командой:
+# ansible-playbook --ask-become-pass /media/mole/backup/backup/ansible/main.yml
+# После запуска спросит рутовый пароль для become
+- hosts: localhost
+  vars:
+    Config_folder: "/media/mole/backup/backup/"
+    User: mole
+    Group: mole  
+    Home: "/home/mole/"
+  tasks:
+
+  - name: Install apt stuff
+    become: true
+    apt:
+      name:
+      - zsh
+      - vim
+      - powerline
+      - telegram-desktop
+      - thunderbird
+      - python3-pip
+      - curl
+      - libfuse2           # тоже для чего-то нужна
+      - openssh-server
+      - libgl1-mesa-glx    # нужна для Zoom
+      - libegl1-mesa       # нужна для Zoom
+      - libxcb-xtest0      # нужна для Zoom
+      - libxcb-xinerama0   # нужна для Zoom
+      state: latest
+
+  - name: Install snap stuff
+    become: true
+    snap:
+      name:
+      - mattermost-desktop
+      - deadbeef-vs
+# Со временем, придется править ссылку 
+  - name: Install Zoom from url
+    become: true
+    apt:
+      deb: https://zoom.us/client/5.13.7.683/zoom_amd64.deb
+
+# Эта хреновина нужна для работы Fleet иначе он файлы нормально не парсит
+# Сам Fleet ставится отдельно, через IDE. Пока не нашел приличного способа установить его через ансибл
+  - name: Set Inotify Watches Limit
+    become: true
+    lineinfile:
+      path: /etc/sysctl.conf
+      line: 'fs.inotify.max_user_watches = 2524288'
+
+# Все что идет дальше - это рековери всяких конфигов и бэкапов. Нуждается в серьезной доработке. Я плохо разобрался с модулем copy
+# Сделать идемпотентной
+  - name: Install oh-my-zsh
+    shell: sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+    ignore_errors: yes
+    when: false
+    args:
+      chdir: "{{ Home }}"
+# Сделать идемпотентной
+  - name: zsh configs recovery
+    become: true
+    when: 1!=1  # это заглушка. Т.к. я еще не разобрался с идемпотентностью этой  и других джобов
+    copy:
+      src: '{{ Config_folder }}.zshrc'
+      dest: "{{ Home }}"
+      owner: "{{ User }}"
+      group: "{{ Group }}"
+# Так и не смог нормально заставить ее отработать
+  - name: zsh history recovery
+    become: true
+    when: false
+    copy:
+      src: '{{ Config_folder }}.zsh_history'
+      dest: "{{ Home }}"
+      owner: "{{ User }}"
+      group: "{{ Group }}"
+# сделать идемпотентной
+  - name: zsh syntax highlighting recovery
+    become: true
+    when: false  
+    copy:
+      src: '{{ Config_folder }}.zsh-syntax-highlighting'
+      dest: "{{ Home }}"
+      owner: "{{ User }}"
+      group: "{{ Group }}"
+# сделать идемпотентной
+  - name: Make zsh as default for root
+    become: true
+    when: false
+    shell: chsh -s /bin/zsh root
+# Сделать идемпотентной
+  - name: Make zsh as default for {{ User }}
+    become: true
+    when: false
+    shell: chsh -s /bin/zsh {{ User }}
+# А вот эта отлично отработала, только пока не понял как ее сделать идемпотентной
+  - name: Thunderbird config recovery
+    become: true
+    when: false
+    copy:
+      src: '{{ Config_folder }}.thunderbird'
+      dest: "{{ Home }}"
+      owner: "{{ User }}"
+      group: "{{ Group }}"
+# Эта хрень не дала нужного резульатата
+  - name: snap recovery
+    become: true
+    when: false
+    copy:
+      src: '{{ Config_folder }}snap'
+      dest: "{{ Home }}"
+      owner: "{{ User }}"
+      group: "{{ Group }}"
+# Эта хрень так и не заработала
+  - name: work recovery
+    when: false
+    copy:
+      src: '{{ Config_folder }}work'
+      dest: '{{ Home }}work'
+      owner: "{{ User }}"
+      group: "{{ Group }}"
+# Эту даже не проверял
+  - name: skillbox recovery
+    when: false
+    copy:
+      src: '{{ Config_folder }}skillbox'
+      dest: '{{ Home }}skillbox'
+      owner: "{{ User }}"
+      group: "{{ Group }}"
+...
